@@ -1,3 +1,6 @@
+import hmac
+import os
+
 import httpx
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
@@ -6,6 +9,22 @@ from starlette.responses import JSONResponse
 ANKI_CONNECT = "http://localhost:8765"
 DECK = "Mixed"
 MODEL = "Back+Front+Usage"
+
+
+def _load_zehntage_key() -> str:
+    """Shared secret for the /zehntage/* endpoints.
+
+    Read from a `zehntage.key` file next to this script, or the ZEHNTAGE_KEY
+    environment variable. The file is never committed to version control.
+    """
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zehntage.key")
+    if os.path.exists(path):
+        with open(path) as f:
+            return f.read().strip()
+    return os.environ.get("ZEHNTAGE_KEY", "")
+
+
+ZEHNTAGE_KEY = _load_zehntage_key()
 
 mcp = FastMCP(
     "Anki",
@@ -59,6 +78,15 @@ async def add_cards(cards: list[dict]) -> str:
 # Plain-HTTP endpoints used by the ZehnTage nvim plugin and browser extension.
 # Cards added here are tagged "zehntage" so they can be listed and deleted
 # independently of cards added through the add_cards MCP tool.
+# Every request must carry the shared secret in the `X-Zehntage-Key` header.
+
+def _auth_error(request: Request):
+    """Return a 401 JSONResponse when the request lacks the right key, else None."""
+    provided = request.headers.get("x-zehntage-key", "")
+    if not ZEHNTAGE_KEY or not hmac.compare_digest(provided, ZEHNTAGE_KEY):
+        return JSONResponse({"ok": False, "error": "unauthorized"}, status_code=401)
+    return None
+
 
 def _note_payload(card: dict) -> dict:
     return {
@@ -78,6 +106,8 @@ def _note_payload(card: dict) -> dict:
 @mcp.custom_route("/zehntage/add", methods=["POST"])
 async def zehntage_add(request: Request) -> JSONResponse:
     """Add one card (JSON object) or several (JSON array) tagged "zehntage"."""
+    if (err := _auth_error(request)) is not None:
+        return err
     try:
         body = await request.json()
         cards = body if isinstance(body, list) else [body]
@@ -91,6 +121,8 @@ async def zehntage_add(request: Request) -> JSONResponse:
 @mcp.custom_route("/zehntage/list", methods=["GET"])
 async def zehntage_list(request: Request) -> JSONResponse:
     """Return every "zehntage"-tagged note as [{front, back, notes, context}]."""
+    if (err := _auth_error(request)) is not None:
+        return err
     try:
         ids = await anki_request("findNotes", query="tag:zehntage")
         if not ids:
@@ -113,6 +145,8 @@ async def zehntage_list(request: Request) -> JSONResponse:
 @mcp.custom_route("/zehntage/delete", methods=["POST"])
 async def zehntage_delete(request: Request) -> JSONResponse:
     """Delete the "zehntage"-tagged note(s) whose Front matches {"front": ...}."""
+    if (err := _auth_error(request)) is not None:
+        return err
     try:
         body = await request.json()
         front = (body.get("front") or "").replace('"', "")

@@ -19,6 +19,11 @@ python -m venv .venv
 The server listens on `0.0.0.0:3457`. Anki must be running with AnkiConnect
 reachable at `http://localhost:8765`.
 
+The companion `/zehntage/*` HTTP endpoints are guarded by a shared secret.
+Put it in a `zehntage.key` file next to `server.py` (or set the `ZEHNTAGE_KEY`
+environment variable); requests must send it in the `X-Zehntage-Key` header.
+The `zehntage.key` file is git-ignored and must never be committed.
+
 To run it as a service, adapt and install `anki-mcp.service`:
 
 ```sh

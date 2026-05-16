@@ -3,3 +3,5 @@ __pycache__/
 .venv/
 anki-mcp-venv/
 .claude/
+zehntage.key
+*.key
