@@ -1,0 +1,15 @@
+[Unit]
+Description=Anki MCP Server
+After=network.target
+
+[Service]
+Type=simple
+User=claude
+Group=claude
+WorkingDirectory=/home/claude/anki-mcp
+ExecStart=/home/claude/anki-mcp-venv/bin/python server.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
