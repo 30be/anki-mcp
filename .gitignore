@@ -3,5 +3,11 @@ __pycache__/
 .venv/
 anki-mcp-venv/
 .claude/
+
+# Secrets — read at runtime, never commit
 zehntage.key
 *.key
+upload_url.txt
+
+# Local/legacy upload staging (real uploads go to /tmp)
+uploads/
